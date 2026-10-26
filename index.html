@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Live Analog World Clocks</title>
+<style>
+  :root { --clock-size: min(17vw, 230px); --white: #fff; --accent: #e8b85a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 100%; height: 100%; background: transparent !important; }
+  body { font-family: Arial, Helvetica, sans-serif; color: var(--white); }
+  .clocks { width: 100%; height: 100%; display: flex; flex-wrap: nowrap; align-items: center; justify-content: space-evenly; gap: clamp(8px, 1.5vw, 28px); padding: 12px; background: transparent; }
+  .clock-card { width: var(--clock-size); min-width: 0; flex: 1 1 0; max-width: 230px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  canvas { display: block; width: 100%; aspect-ratio: 1; overflow: visible; }
+  .city { font-size: clamp(12px, 1.35vw, 20px); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; text-align: center; white-space: nowrap; text-shadow: 0 1px 5px #0008; }
+  .digital { font-variant-numeric: tabular-nums; font-size: clamp(11px, 1vw, 15px); letter-spacing: .08em; opacity: .9; text-shadow: 0 1px 5px #0008; }
+  @media (max-width: 700px) { :root { --clock-size: 18vw; } .clocks { gap: 6px; padding: 6px; } .city { letter-spacing: 0; font-size: clamp(9px, 1.7vw, 12px); } .digital { font-size: clamp(8px, 1.3vw, 11px); } }
+</style>
+</head>
+<body>
+<div class="clocks" id="clocks">
+  <div class="clock-card" data-zone="America/New_York" data-city="Washington, DC"><canvas aria-label="Washington DC analog clock"></canvas><div class="city">Washington, DC</div><div class="digital"></div></div>
+  <div class="clock-card" data-zone="Asia/Shanghai" data-city="Beijing"><canvas aria-label="Beijing analog clock"></canvas><div class="city">Beijing</div><div class="digital"></div></div>
+  <div class="clock-card" data-zone="Asia/Taipei" data-city="Taipei"><canvas aria-label="Taipei analog clock"></canvas><div class="city">Taipei</div><div class="digital"></div></div>
+  <div class="clock-card" data-zone="Pacific/Honolulu" data-city="Honolulu"><canvas aria-label="Honolulu analog clock"></canvas><div class="city">Honolulu</div><div class="digital"></div></div>
+  <div class="clock-card" data-zone="Europe/London" data-city="London"><canvas aria-label="London analog clock"></canvas><div class="city">London</div><div class="digital"></div></div>
+</div>
+<script>
+(() => {
+  const cards = [...document.querySelectorAll('.clock-card')];
+  const fmtParts = (date, zone) => {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: zone, hour:'numeric', minute:'numeric', second:'numeric', hour12:false }).formatToParts(date);
+    const get = t => Number(parts.find(p => p.type === t)?.value || 0);
+    let h = get('hour'); if (h === 24) h = 0;
+    return { h, m:get('minute'), s:get('second') };
+  };
+  function draw(card, now) {
+    const canvas = card.querySelector('canvas');
+    const rect = canvas.getBoundingClientRect();
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const side = Math.max(120, Math.round(Math.min(rect.width || 180, rect.height || rect.width || 180) * dpr));
+    if (canvas.width !== side || canvas.height !== side) { canvas.width = side; canvas.height = side; }
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, side, side);
+    const scale = side / 200; ctx.save(); ctx.scale(scale, scale);
+    const cx=100, cy=100, r=91, {h,m,s}=fmtParts(now, card.dataset.zone);
+    // Transparent face; crisp white outline and fine broadcast-gold details.
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.strokeStyle='rgba(255,255,255,.96)'; ctx.lineWidth=2.2; ctx.stroke();
+    for(let i=0;i<60;i++) {
+      const a=i*Math.PI/30-Math.PI/2, major=i%5===0;
+      const inner=r-(major?13:6), outer=r-2;
+      ctx.beginPath(); ctx.moveTo(cx+Math.cos(a)*inner,cy+Math.sin(a)*inner); ctx.lineTo(cx+Math.cos(a)*outer,cy+Math.sin(a)*outer);
+      ctx.strokeStyle=major?'rgba(232,184,90,1)':'rgba(255,255,255,.78)'; ctx.lineWidth=major?2:1; ctx.stroke();
+    }
+    // Hands
+    const secondA=s*Math.PI/30-Math.PI/2;
+    const minuteA=(m+s/60)*Math.PI/30-Math.PI/2;
+    const hourA=((h%12)+m/60)*Math.PI/6-Math.PI/2;
+    function hand(a,len,w,color,tail=0){ ctx.beginPath(); ctx.moveTo(cx-Math.cos(a)*tail,cy-Math.sin(a)*tail); ctx.lineTo(cx+Math.cos(a)*len,cy+Math.sin(a)*len); ctx.strokeStyle=color; ctx.lineWidth=w; ctx.lineCap='round'; ctx.stroke(); }
+    hand(hourA,49,5,'#ffffff',5); hand(minuteA,69,3.2,'#ffffff',7); hand(secondA,76,1.35,'#e8b85a',15);
+    ctx.beginPath(); ctx.arc(cx,cy,4,0,Math.PI*2); ctx.fillStyle='#e8b85a'; ctx.fill();
+    ctx.restore();
+    card.querySelector('.digital').textContent = new Intl.DateTimeFormat('en-US',{timeZone:card.dataset.zone,hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(now);
+  }
+  function tick(){ const now=new Date(); cards.forEach(c=>draw(c,now)); }
+  tick(); setInterval(tick,250);
+  window.addEventListener('resize', tick);
+})();
+</script>
+</body>
+</html>
